@@ -849,7 +849,7 @@ Citizen.CreateThread(function ()
             if SmokedBeehives[1] ~= nil and not CountdownStartet then
                 CountdownStartet = true
                 if Config.Debug then print('WildHivesResetTimerStartet') end
-                local Counter = Config.ResetWildHivesTimer * 6000
+                local Counter = Config.ResetWildHivesTimer * 60000
                 while Counter > 0 do
                     Citizen.Wait(30000)
                     Counter = Counter - 30000
