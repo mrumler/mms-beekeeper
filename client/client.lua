@@ -110,7 +110,7 @@ AddEventHandler('mms-beekeeper:client:CreateBeehive',function()
         Bees = 0,
         Queen = 0,
         Coords = { 
-            x = MyCoords.x + 1,0,
+            x = MyCoords.x + 1.0,
             y = MyCoords.y + 1.0,
             z = MyCoords.z -1,
             heading = MyHeading,
