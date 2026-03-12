@@ -82,6 +82,7 @@ AddEventHandler('mms-beekeeper:client:CreateBeehive',function()
 
     local MyCoords = GetEntityCoords(PlayerPedId())
     local MyHeading = GetEntityHeading(PlayerPedId())
+	local SpawnCoords = GetOffsetFromEntityInWorldCoords(PlayerPedId(), 0.0, 1.0, 0.0)
     if BeehiveData ~= nil then
         for h,v in ipairs(BeehiveData) do
             local Data = json.decode(v.data)
@@ -110,8 +111,8 @@ AddEventHandler('mms-beekeeper:client:CreateBeehive',function()
         Bees = 0,
         Queen = 0,
         Coords = { 
-            x = MyCoords.x + 1.0,
-            y = MyCoords.y + 1.0,
+            x = SpawnCoords.x,
+            y = SpawnCoords.y,
             z = MyCoords.z -1,
             heading = MyHeading,
         },
