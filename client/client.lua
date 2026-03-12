@@ -895,7 +895,7 @@ end
 
 ---- CleanUp on Resource Restart 
 
-RegisterNetEvent('onResourceStop',function(resource)
+AddEventHandler('onResourceStop',function(resource)
     if resource == GetCurrentResourceName() then
         for _, beehive in ipairs(CreatedBeehives) do
             DeleteObject(beehive)
