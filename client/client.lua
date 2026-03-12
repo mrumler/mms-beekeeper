@@ -19,6 +19,153 @@ local bees_cloud_group = "core"
 local bees_cloud_name = "ent_amb_insect_bee_swarm"
 local CreatedFXSwarms = {}
 local WildHivesSpawned = false
+local WildHiveTimers = {}
+local StartBeeFX
+
+-----------------------------------------------
+---------------- BeeFx Helpers  ---------------
+-----------------------------------------------
+
+local function GetBeeFXCoords(CurrentHive, isWildHive)
+    if isWildHive then
+        return CurrentHive.x, CurrentHive.y, CurrentHive.z
+    end
+
+    return CurrentHive.Coords.x, CurrentHive.Coords.y, CurrentHive.Coords.z
+end
+
+local function GetWildHiveKey(CurrentHive)
+    return string.format("%.3f:%.3f:%.3f", CurrentHive.x, CurrentHive.y, CurrentHive.z)
+end
+
+local function RemoveWildHiveFromList(HiveList, CurrentHive)
+    for index = #HiveList, 1, -1 do
+        local Hive = HiveList[index]
+        local Distance = GetDistanceBetweenCoords(
+            CurrentHive.x, CurrentHive.y, CurrentHive.z,
+            Hive.x, Hive.y, Hive.z,
+            true
+        )
+        if Distance < 1.0 then
+            table.remove(HiveList, index)
+        end
+    end
+end
+
+local function ResetWildHiveTimer(CurrentHive)
+    WildHiveTimers[GetWildHiveKey(CurrentHive)] = Config.ResetWildHivesTimer * 60000
+end
+
+local function ClearWildHiveState(CurrentHive)
+    RemoveWildHiveFromList(TakenHoneyBeehives, CurrentHive)
+    RemoveWildHiveFromList(TakenQueenBeehives, CurrentHive)
+    RemoveWildHiveFromList(TakenBeeBeehives, CurrentHive)
+    RemoveWildHiveFromList(SmokedBeehives, CurrentHive)
+    StartBeeFX(CurrentHive, true)
+    WildHiveTimers[GetWildHiveKey(CurrentHive)] = nil
+end
+
+local function StopBeeFX(CurrentHive, isWildHive)
+    local x, y, z = GetBeeFXCoords(CurrentHive, isWildHive)
+    for index = #CreatedFXSwarms, 1, -1 do
+        local BeesFX = CreatedFXSwarms[index]
+        if BeesFX.isWildHive == isWildHive then
+            local Distance = GetDistanceBetweenCoords(
+                x, y, z,
+                BeesFX.x, BeesFX.y, BeesFX.z,
+                true
+            )
+            if Distance < 1.0 then
+                StopParticleFxLooped(BeesFX.fx, true)
+                table.remove(CreatedFXSwarms, index)
+            end
+        end
+    end
+end
+
+local function StopPlacedHiveFX()
+    for index = #CreatedFXSwarms, 1, -1 do
+        local BeesFX = CreatedFXSwarms[index]
+        if not BeesFX.isWildHive then
+            StopParticleFxLooped(BeesFX.fx, true)
+            table.remove(CreatedFXSwarms, index)
+        end
+    end
+end
+
+local function StopWildHiveFXEntries()
+    for index = #CreatedFXSwarms, 1, -1 do
+        local BeesFX = CreatedFXSwarms[index]
+        if BeesFX.isWildHive then
+            StopParticleFxLooped(BeesFX.fx, true)
+            table.remove(CreatedFXSwarms, index)
+        end
+    end
+end
+
+local function ClearWildHives()
+    for _, WildBeehive in ipairs(CreatedWildBeehives) do
+        DeleteObject(WildBeehive)
+    end
+    CreatedWildBeehives = {}
+    StopWildHiveFXEntries()
+    WildHiveTimers = {}
+end
+
+local function SpawnHiveObject(ModelName, x, y, z, heading, rotx, roty, rotz)
+    local ModelHash = GetHashKey(ModelName)
+    RequestModel(ModelHash)
+    while not HasModelLoaded(ModelHash) do
+        Citizen.Wait(100)
+    end
+
+    local HiveObject = CreateObject(ModelHash, x, y, z, false, true, false)
+    SetEntityInvincible(HiveObject, true)
+    FreezeEntityPosition(HiveObject, true)
+    SetEntityAlwaysPrerender(HiveObject, false)
+    SetEntityVisible(HiveObject, true)
+
+    if heading ~= nil then
+        SetEntityHeading(HiveObject, heading)
+    end
+
+    if rotx ~= nil and roty ~= nil and rotz ~= nil and heading ~= nil then
+        Citizen.InvokeNative(0x203BEFFDBE12E96A, HiveObject, x, y, z, heading, rotx, roty, rotz)
+    end
+
+    SetModelAsNoLongerNeeded(ModelHash)
+    return HiveObject
+end
+
+StartBeeFX = function(CurrentHive, isWildHive)
+    if not Config.UseBeeFX then
+        return
+    end
+
+    local x, y, z = GetBeeFXCoords(CurrentHive, isWildHive)
+    for _, BeesFX in ipairs(CreatedFXSwarms) do
+        if BeesFX.isWildHive == isWildHive then
+            local Distance = GetDistanceBetweenCoords(
+                x, y, z,
+                BeesFX.x, BeesFX.y, BeesFX.z,
+                true
+            )
+            if Distance < 1.0 then
+                return
+            end
+        end
+    end
+
+    Citizen.InvokeNative(0xA10DB07FC234DD12, bees_cloud_group)
+    local BeeFXSwarm = Citizen.InvokeNative(0xBA32867E86125D3A, bees_cloud_name, x, y, z, 0.0, 0.0, 0.0, 1.0, false, false, false, false)
+    CreatedFXSwarms[#CreatedFXSwarms + 1] = {
+        x = x,
+        y = y,
+        z = z,
+        fx = BeeFXSwarm,
+        isWildHive = isWildHive,
+    }
+end
 
 -----------------------------------------------
 --------------- GetBeehivesData ---------------
@@ -56,14 +203,15 @@ AddEventHandler('mms-beekeeper:client:ReloadData',function()
     for _, beehive in ipairs(CreatedBeehives) do
         DeleteObject(beehive)
     end
+    CreatedBeehives = {}
     for _, blips in ipairs(CreatedBlips) do
         blips:Remove()
     end
-    for _,BeesFX in ipairs(CreatedFXSwarms) do
-        StopParticleFxLooped(BeesFX,true)
-    end
+    CreatedBlips = {}
+    StopPlacedHiveFX()
     TriggerServerEvent('mms-beekeeper:server:GetBeehivesData')
 end)
+
 -----------------------------------------------
 --------------- Create Beehive ----------------
 -----------------------------------------------
@@ -82,7 +230,7 @@ AddEventHandler('mms-beekeeper:client:CreateBeehive',function()
 
     local MyCoords = GetEntityCoords(PlayerPedId())
     local MyHeading = GetEntityHeading(PlayerPedId())
-	local SpawnCoords = GetOffsetFromEntityInWorldCoords(PlayerPedId(), 0.0, 1.0, 0.0)
+    local SpawnCoords = GetOffsetFromEntityInWorldCoords(PlayerPedId(), 0.0, 1.0, 0.0)
     if BeehiveData ~= nil then
         for h,v in ipairs(BeehiveData) do
             local Data = json.decode(v.data)
@@ -145,19 +293,13 @@ RegisterNetEvent('mms-beekeeper:client:CreateBeehivesOnStart')
 AddEventHandler('mms-beekeeper:client:CreateBeehivesOnStart',function()
     for h,v in ipairs(BeehiveData) do
         local Data = json.decode(v.data)
-        local Beehive = CreateObject(Data.Model, Data.Coords.x, Data.Coords.y, Data.Coords.z,false,true,false)
         if Data.Coords.heading == nil then
             Data.Coords.heading = 100
         end
-        SetEntityHeading(Beehive,Data.Coords.heading)
-        SetEntityInvincible(Beehive,true)
-        FreezeEntityPosition(Beehive,true)
-        SetEntityAlwaysPrerender(Beehive,false)
+        local Beehive = SpawnHiveObject(Data.Model, Data.Coords.x, Data.Coords.y, Data.Coords.z, Data.Coords.heading)
         CreatedBeehives[#CreatedBeehives + 1] = Beehive
-        if Config.UseBeeFX then
-            Citizen.InvokeNative(0xA10DB07FC234DD12, bees_cloud_group)
-            local BeeFXSwarm = Citizen.InvokeNative(0xBA32867E86125D3A , bees_cloud_name, Data.Coords.x, Data.Coords.y, Data.Coords.z, 0.0, 0.0, 0.0, 1.0, false, false, false, false)
-            CreatedFXSwarms[#CreatedFXSwarms + 1] = BeeFXSwarm
+        if Data.Bees > 0 then
+            StartBeeFX(Data, false)
         end
         if Config.UseBlips then
             if v.charident == CharID then
@@ -225,8 +367,6 @@ AddEventHandler('mms-beekeeper:client:StartMainThred',function()
         if Config.Debug then print('DEBUG: Reloading Data') end
     end
 end)
-
-
 
 -----------------------------------------------
 ------------------- Menu Data -----------------
@@ -514,38 +654,34 @@ end)
 RegisterNetEvent('mms-beekeeper:client:SpawnWildBeehives')
 AddEventHandler('mms-beekeeper:client:SpawnWildBeehives',function()
     Citizen.Wait(5000)
-    if Config.WildBeehiveSpawn then
+    if WildHivesSpawned or not Config.WildBeehiveSpawn then
+        return
+    end
 
-        local WildBeehivePromptGroup = BccUtils.Prompts:SetupPromptGroup()
-        local SmokeBeehive = WildBeehivePromptGroup:RegisterPrompt(_U('SmokeBeehive'), 0x760A9C6F, 1, 1, true, 'click')--, {timedeventhash = 'SHORT_TIMED_EVENT'}) -- KEY G
-        local TakeBees = WildBeehivePromptGroup:RegisterPrompt(_U('TakeBees'), 0x27D1C284, 1, 1, true, 'click')--, {timedeventhash = 'SHORT_TIMED_EVENT'}) -- KEY R
-        local TakeQueen = WildBeehivePromptGroup:RegisterPrompt(_U('TakeQueen'), 0x5181713D, 1, 1, true, 'click')--, {timedeventhash = 'SHORT_TIMED_EVENT'}) -- KEY Spacebar
-        local TakeHoney = WildBeehivePromptGroup:RegisterPrompt(_U('TakeHoneyWildHive'), 0x2CD5343E, 1, 1, true, 'click')--, {timedeventhash = 'SHORT_TIMED_EVENT'}) -- KEY Enter
+    ClearWildHives()
 
-        -- CreateBeehives 
+    local WildBeehivePromptGroup = BccUtils.Prompts:SetupPromptGroup()
+    local SmokeBeehive = WildBeehivePromptGroup:RegisterPrompt(_U('SmokeBeehive'), 0x760A9C6F, 1, 1, true, 'click')--, {timedeventhash = 'SHORT_TIMED_EVENT'}) -- KEY G
+    local TakeBees = WildBeehivePromptGroup:RegisterPrompt(_U('TakeBees'), 0x27D1C284, 1, 1, true, 'click')--, {timedeventhash = 'SHORT_TIMED_EVENT'}) -- KEY R
+    local TakeQueen = WildBeehivePromptGroup:RegisterPrompt(_U('TakeQueen'), 0x5181713D, 1, 1, true, 'click')--, {timedeventhash = 'SHORT_TIMED_EVENT'}) -- KEY Spacebar
+    local TakeHoney = WildBeehivePromptGroup:RegisterPrompt(_U('TakeHoneyWildHive'), 0x2CD5343E, 1, 1, true, 'click')--, {timedeventhash = 'SHORT_TIMED_EVENT'}) -- KEY Enter
+
+    -- CreateBeehives 
+    for h,v in ipairs(Config.WildBeehives) do
+        local WildBeehive = SpawnHiveObject(Config.WildBeehiveModel, v.x, v.y, v.z, v.heading, v.rotx, v.roty, v.rotz)
+        CreatedWildBeehives[#CreatedWildBeehives + 1] = WildBeehive
+        StartBeeFX(v, true)
+    end
+    WildHivesSpawned = true
+    -- Prompt for Wild Beehives
+    while true do
+        Citizen.Wait(5)
         for h,v in ipairs(Config.WildBeehives) do
-            local WildBeehive = CreateObject(Config.WildBeehiveModel, v.x, v.y, v.z,true,true,false)
-            SetEntityInvincible(WildBeehive,true)
-            FreezeEntityPosition(WildBeehive,true)
-            SetEntityAlwaysPrerender(WildBeehive,false)
-            Citizen.InvokeNative(0x203BEFFDBE12E96A, WildBeehive, v.x, v.y, v.z, v.heading, v.rotx, v.roty, v.rotz)
-            CreatedWildBeehives[#CreatedWildBeehives + 1] = WildBeehive
-            if Config.UseBeeFX then
-                Citizen.InvokeNative(0xA10DB07FC234DD12, bees_cloud_group)
-                local BeeFXSwarm = Citizen.InvokeNative(0xBA32867E86125D3A , bees_cloud_name, v.x, v.y, v.z, 0.0, 0.0, 0.0, 1.0, false, false, false, false)
-                CreatedFXSwarms[#CreatedFXSwarms + 1] = BeeFXSwarm
-            end
-        end
-        WildHivesSpawned = true
-        -- Prompt for Wild Beehives
-        while true do
-            Citizen.Wait(5)
-            for h,v in ipairs(Config.WildBeehives) do
-                MyCoords = GetEntityCoords(PlayerPedId())
-                local Distance = GetDistanceBetweenCoords(MyCoords.x, MyCoords.y, MyCoords.z, v.x, v.y, v.z, true)
-                local CurrentHive = v
-                if Distance <= 2 then
-                    WildBeehivePromptGroup:ShowGroup(_U('WildBeehivePromptGroup'))
+            MyCoords = GetEntityCoords(PlayerPedId())
+            local Distance = GetDistanceBetweenCoords(MyCoords.x, MyCoords.y, MyCoords.z, v.x, v.y, v.z, true)
+            local CurrentHive = v
+            if Distance <= 2 then
+                WildBeehivePromptGroup:ShowGroup(_U('WildBeehivePromptGroup'))
 
                     if SmokeBeehive:HasCompleted() then
                         local IsSmoked = false
@@ -816,27 +952,42 @@ AddEventHandler('mms-beekeeper:client:SpawnWildBeehives',function()
                             VORPcore.NotifyRightTip(_U('StillInsectsInHive'), 5000)
                         end
                     end
-                end
             end
         end
     end
 end)
 
 RegisterNetEvent('mms-beekeeper:client:BeehiveSmoked',function(CurrentHive)
+    RemoveWildHiveFromList(SmokedBeehives, CurrentHive)
     table.insert(SmokedBeehives,CurrentHive)
+    ResetWildHiveTimer(CurrentHive)
 end)
 
 RegisterNetEvent('mms-beekeeper:client:BeesTakenFromHive',function(CurrentHive)
+    RemoveWildHiveFromList(TakenBeeBeehives, CurrentHive)
     table.insert(TakenBeeBeehives,CurrentHive)
+    StopBeeFX(CurrentHive, true)
 end)
 
 RegisterNetEvent('mms-beekeeper:client:QueenTakenFromHive',function(CurrentHive)
+    RemoveWildHiveFromList(TakenQueenBeehives, CurrentHive)
     table.insert(TakenQueenBeehives,CurrentHive)
 end)
 
 RegisterNetEvent('mms-beekeeper:client:HoneyTakenFromHive',function(CurrentHive)
     Progressbar(CurrentHive.TakeProductTime,_U('TakeHoneyProgressbar'))
+    RemoveWildHiveFromList(TakenHoneyBeehives, CurrentHive)
     table.insert(TakenHoneyBeehives,CurrentHive)
+    ResetWildHiveTimer(CurrentHive)
+end)
+
+RegisterNetEvent('mms-beekeeper:client:UpdateBeeFX',function(Coords, BeeAmount)
+    local CurrentHive = { Coords = Coords }
+    if BeeAmount > 0 then
+        StartBeeFX(CurrentHive, false)
+    else
+        StopBeeFX(CurrentHive, false)
+    end
 end)
 
 -----------------------------------------------
@@ -847,20 +998,16 @@ Citizen.CreateThread(function ()
     if Config.ResetWildHives then
         while true do
             Citizen.Wait(10000)
-            if SmokedBeehives[1] ~= nil and not CountdownStartet then
-                CountdownStartet = true
-                if Config.Debug then print('WildHivesResetTimerStartet') end
-                local Counter = Config.ResetWildHivesTimer * 60000
-                while Counter > 0 do
-                    Citizen.Wait(30000)
-                    Counter = Counter - 30000
+            for _, WildHive in ipairs(Config.WildBeehives) do
+                local HiveKey = GetWildHiveKey(WildHive)
+                local Counter = WildHiveTimers[HiveKey]
+                if Counter ~= nil then
+                    Counter = Counter - 10000
                     if Counter <= 0 then
-                        CountdownStartet = false
-                        TakenHoneyBeehives = {}
-                        TakenQueenBeehives = {}
-                        TakenBeeBeehives = {}
-                        SmokedBeehives = {}
-                        if Config.Debug then print('WildHivesCleared') end
+                        ClearWildHiveState(WildHive)
+                        if Config.Debug then print('WildHiveCleared: ' .. HiveKey) end
+                    else
+                        WildHiveTimers[HiveKey] = Counter
                     end
                 end
             end
@@ -903,11 +1050,7 @@ AddEventHandler('onResourceStop',function(resource)
         for _, blips in ipairs(CreatedBlips) do
             blips:Remove()
         end
-        for _, wildbeehives in ipairs(CreatedWildBeehives) do
-            DeleteObject(wildbeehives)
-        end
-        for _,BeesFX in ipairs(CreatedFXSwarms) do
-            StopParticleFxLooped(BeesFX,true)
-        end
+        ClearWildHives()
+        StopPlacedHiveFX()
     end
 end)

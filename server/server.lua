@@ -77,7 +77,6 @@ RegisterServerEvent('mms-beekeeper:server:GetBeehivesData',function()
     end
 end)
 
-
 -----------------------------------------------
 ----------- Save Beehive to Database ----------
 -----------------------------------------------
@@ -117,6 +116,7 @@ RegisterServerEvent('mms-beekeeper:server:DoTheUpdateProcess',function()
         
         for h,v in ipairs(Beehives) do
             local Data = json.decode(v.data)
+            local PreviousBees = Data.Bees
             
             -----------------------------------------------
             ------------------ FOOD UPDATE ----------------
@@ -295,11 +295,24 @@ RegisterServerEvent('mms-beekeeper:server:DoTheUpdateProcess',function()
             -----------------------------------------------
             if not HiveDeleted then
                 MySQL.update('UPDATE `mms_beekeeper` SET data = ? WHERE id = ?',{json.encode(Data),v.id})
+                if Data.Bees ~= PreviousBees then
+                    BroadcastBeeFXUpdate(Data.Coords, Data.Bees)
+                end
             end
         end
 
     end
 end)
+
+-----------------------------------------------
+-- Inform Clients when Hive Bee num changed ---
+-----------------------------------------------
+
+local function BroadcastBeeFXUpdate(Coords, BeeAmount)
+    for _, player in ipairs(GetPlayers()) do
+        TriggerClientEvent('mms-beekeeper:client:UpdateBeeFX', player, Coords, BeeAmount)
+    end
+end
 
 -----------------------------------------------
 ----------- Get New Data For Menu -------------
@@ -492,6 +505,7 @@ RegisterServerEvent('mms-beekeeper:server:AddBees',function(HiveID,Queen)
             Data.BeeSettings.ProductHappy = BeeTable.ProductHappy
             Data.BeeSettings.ProductNormal = BeeTable.ProductNormal
             MySQL.update('UPDATE `mms_beekeeper` SET data = ? WHERE id = ?',{json.encode(Data),HiveID})
+            BroadcastBeeFXUpdate(Data.Coords, Data.Bees)
             VORPcore.NotifyRightTip(src,_U('BeesAdded'),5000)
             if Config.GiveBackEmptyJarBees then
                 CanCarry = exports.vorp_inventory:canCarryItem(src, Config.GiveBackEmptyJarBeesItem, 1)
