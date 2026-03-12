@@ -73,7 +73,7 @@ RegisterServerEvent('mms-beekeeper:server:GetBeehivesData',function()
     local CharIdent = Character.charIdentifier
     local Beehives = MySQL.query.await("SELECT * FROM mms_beekeeper", { })
     if #Beehives > 0 then
-        TriggerClientEvent('mms-beekeeper:client:ReciveData',src,Beehives,CharIdent)
+        TriggerClientEvent('mms-beekeeper:client:ReceiveData',src,Beehives,CharIdent)
     end
 end)
 
@@ -274,7 +274,7 @@ RegisterServerEvent('mms-beekeeper:server:DoTheUpdateProcess',function()
             if Data.Damage == nil then
                 Data.Damage = 0
             end
-            if Config.DetroyHives then
+            if Config.DestroyHives then
                 if Data.Bees <= 0 and Data.Queen <= 0 then
                     local NewDamage = Data.Damage + Config.IncreaseDamageBy
                     Data.Damage = NewDamage
@@ -622,7 +622,7 @@ RegisterServerEvent('mms-beekeeper:server:TakeBeesFromWildHive',function(Current
             exports.vorp_inventory:subItem(src,Config.EmptyBeeJar,1)
             VORPcore.NotifyRightTip(src,_U('BeesTaken'),5000)
         else
-            VORPcore.NotifyRightTip(src,_U('NoInvetorySpace'),5000)
+            VORPcore.NotifyRightTip(src,_U('NoInventorySpace'),5000)
         end
     else
         VORPcore.NotifyRightTip(src,_U('NoTool') .. Config.EmptyBeeJarLabel .. _U('OrTool') .. Config.BugNetLabel,5000)
@@ -646,7 +646,7 @@ RegisterServerEvent('mms-beekeeper:server:TakeQueenFromWildHive',function(Curren
             exports.vorp_inventory:subItem(src,Config.EmptyBeeJar,1)
             VORPcore.NotifyRightTip(src,_U('QueenTaken'),5000)
         else
-            VORPcore.NotifyRightTip(src,_U('NoInvetorySpace'),5000)
+            VORPcore.NotifyRightTip(src,_U('NoInventorySpace'),5000)
         end
     else
         VORPcore.NotifyRightTip(src,_U('NoTool') .. Config.EmptyBeeJarLabel .. _U('OrTool') .. Config.BugNetLabel,5000)
@@ -668,7 +668,7 @@ RegisterServerEvent('mms-beekeeper:server:TakeHoneyFromWildHive',function(Curren
             TriggerClientEvent('mms-beekeeper:client:HoneyTakenFromHive',src,CurrentHive)
             VORPcore.NotifyRightTip(src,_U('HoneySuccessTakenFromHive'),5000)
         else
-            VORPcore.NotifyRightTip(src,_U('NoInvetorySpace'),5000)
+            VORPcore.NotifyRightTip(src,_U('NoInventorySpace'),5000)
         end
     else
         VORPcore.NotifyRightTip(src,_U('MissingJar'),5000)

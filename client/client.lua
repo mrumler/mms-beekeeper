@@ -188,13 +188,13 @@ AddEventHandler('vorp:SelectedCharacter', function()
     TriggerEvent('mms-beekeeper:client:SpawnWildBeehives')
 end)
 
-RegisterNetEvent('mms-beekeeper:client:ReciveData')
-AddEventHandler('mms-beekeeper:client:ReciveData',function(Beehives,CharIdent)
+RegisterNetEvent('mms-beekeeper:client:ReceiveData')
+AddEventHandler('mms-beekeeper:client:ReceiveData',function(Beehives,CharIdent)
     BeehiveData = Beehives
     CharID = CharIdent
     TriggerEvent('mms-beekeeper:client:CreateBeehivesOnStart')
     Citizen.Wait(500)
-    TriggerEvent('mms-beekeeper:client:StartMainThred')
+    TriggerEvent('mms-beekeeper:client:StartMainThread')
 end)
 
 RegisterNetEvent('mms-beekeeper:client:ReloadData')
@@ -211,7 +211,6 @@ AddEventHandler('mms-beekeeper:client:ReloadData',function()
     StopPlacedHiveFX()
     TriggerServerEvent('mms-beekeeper:server:GetBeehivesData')
 end)
-
 -----------------------------------------------
 --------------- Create Beehive ----------------
 -----------------------------------------------
@@ -281,7 +280,7 @@ AddEventHandler('mms-beekeeper:client:CreateBeehive',function()
     if not BeehiveClose then
         TriggerServerEvent('mms-beekeeper:server:SaveBeehiveToDatabase',Data)
     else
-        VORPcore.NotifyRightTip(_U('ToCloseToAnotherHive'),5000)
+        VORPcore.NotifyRightTip(_U('TooCloseToAnotherHive'),5000)
     end
 end)
 
@@ -315,8 +314,8 @@ end)
 ------------------ MainThread -----------------
 -----------------------------------------------
 
-RegisterNetEvent('mms-beekeeper:client:StartMainThred')
-AddEventHandler('mms-beekeeper:client:StartMainThred',function()
+RegisterNetEvent('mms-beekeeper:client:StartMainThread')
+AddEventHandler('mms-beekeeper:client:StartMainThread',function()
     ThreadRunning = true
     -- Owner Prompts
     local BeehivePromptGroup = BccUtils.Prompts:SetupPromptGroup()
@@ -501,7 +500,7 @@ AddEventHandler('mms-beekeeper:client:OpenMenu',function(CurrentBeehive)
                         VORPcore.NotifyRightTip(_U('NotEnoghJars'),5000)
                     end
                 else
-                    VORPcore.NotifyRightTip(_U('NoInvetorySpace'),5000)
+                    VORPcore.NotifyRightTip(_U('NoInventorySpace'),5000)
                 end
             end)
         end
